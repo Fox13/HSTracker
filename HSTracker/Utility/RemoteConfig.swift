@@ -95,6 +95,55 @@ struct ConfigData: Codable {
 struct LiveSecrets: Codable {
     var by_game_type_and_format_type: [String: Set<String>]
     var created_by_game_type_and_format_type: [String: [String: Set<String>]]?
+
+    // Custom decoder to handle API returning empty arrays [] instead of empty dictionaries {}
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        by_game_type_and_format_type = try container.decode([String: Set<String>].self, forKey: .by_game_type_and_format_type)
+
+        // Try to decode the nested dictionary, filtering out entries that are arrays instead of dictionaries
+        if let rawCreatedBy = try? container.decode([String: DictionaryOrArray].self, forKey: .created_by_game_type_and_format_type) {
+            var result: [String: [String: Set<String>]] = [:]
+            for (key, value) in rawCreatedBy {
+                if let dict = value.dictionary {
+                    result[key] = dict
+                }
+                // Skip entries that are empty arrays - they represent "no data"
+            }
+            created_by_game_type_and_format_type = result.isEmpty ? nil : result
+        } else {
+            created_by_game_type_and_format_type = nil
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case by_game_type_and_format_type
+        case created_by_game_type_and_format_type
+    }
+}
+
+// Helper to handle API returning either a dictionary or an empty array
+private enum DictionaryOrArray: Decodable {
+    case dictionary([String: Set<String>])
+    case array([String])
+
+    var dictionary: [String: Set<String>]? {
+        if case .dictionary(let dict) = self {
+            return dict
+        }
+        return nil
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let dict = try? container.decode([String: Set<String>].self) {
+            self = .dictionary(dict)
+        } else if let arr = try? container.decode([String].self) {
+            self = .array(arr)
+        } else {
+            throw DecodingError.typeMismatch(DictionaryOrArray.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected dictionary or array"))
+        }
+    }
 }
 
 class RemoteConfig {

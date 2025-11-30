@@ -33,8 +33,11 @@ class BattlegroundsSession: OverWindowController {
     @IBOutlet var compositionsItems: NSStackView!
     @IBOutlet var compositionsWaiting: NSTextField!
     @IBOutlet var compositionsError: NSTextField!
-    
+
     @IBOutlet var sessionPanel: NSStackView!
+
+    // Subscription status display (programmatically created)
+    private var subscriptionStatusLabel: NSTextField?
     
     private var sessionGames = [BattlegroundsLastGames.GameItem]()
     
@@ -106,12 +109,103 @@ class BattlegroundsSession: OverWindowController {
     
     @MainActor
     func show() {
+        logger.info("BattlegroundsSession: show() called")
         if window?.occlusionState.contains(.visible) ?? false || AppDelegate.instance().coreManager.game.spectator {
+            logger.info("BattlegroundsSession: Skipping show - window visible or spectator mode")
             return
         }
+        logger.info("BattlegroundsSession: Window shown - DEBUG LOGGING ENABLED (v2024-11-30)")
+        logger.info("BattlegroundsSession: About to setup subscription status label")
+        setupSubscriptionStatusLabel()
+        logger.info("BattlegroundsSession: Subscription status label setup complete")
         updateSectionsVisibilities()
         update()
         updateScaling()
+    }
+
+    @MainActor
+    private func setupSubscriptionStatusLabel() {
+        // Only create once
+        if subscriptionStatusLabel != nil {
+            logger.debug("Subscription status label already exists")
+            return
+        }
+
+        logger.debug("Creating subscription status label")
+
+        // Create the label
+        let label = NSTextField(labelWithString: "")
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.alignment = .center
+        label.font = NSFont.systemFont(ofSize: 10)
+        label.textColor = NSColor.white
+        label.isEditable = false
+        label.isBordered = false
+        label.drawsBackground = true
+        label.backgroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.15, alpha: 0.9)
+        label.lineBreakMode = .byTruncatingTail
+
+        // Add to compositions stack (at the top)
+        if let compositionsStack = compositions {
+            logger.debug("Adding subscription status label to compositions stack (subview count: \(compositionsStack.arrangedSubviews.count))")
+            compositionsStack.insertArrangedSubview(label, at: 0)
+            compositionsStack.setCustomSpacing(4, after: label)
+            logger.debug("Label added to stack")
+        } else {
+            logger.error("Compositions stack is nil - cannot add subscription status label")
+        }
+
+        subscriptionStatusLabel = label
+        updateSubscriptionStatusLabel()
+    }
+
+    @MainActor
+    private func updateSubscriptionStatusLabel() {
+        guard let label = subscriptionStatusLabel else {
+            logger.debug("Cannot update subscription status label - label is nil")
+            return
+        }
+
+        let userOwnsTier7 = HSReplayAPI.accountData?.is_tier7 ?? false
+
+        if #available(macOS 10.15, *) {
+            let trialsRemaining = Tier7Trial.remainingTrials ?? 0
+
+            if userOwnsTier7 {
+                label.stringValue = "✓ Tier7 Subscriber"
+                label.textColor = NSColor(red: 0.4, green: 0.8, blue: 0.4, alpha: 1.0) // Green
+                logger.debug("Subscription status: Tier7 Subscriber")
+            } else if trialsRemaining > 0 {
+                if let timeRemaining = Tier7Trial.timeRemaining {
+                    label.stringValue = "Trial: \(trialsRemaining) left · Resets: \(timeRemaining)"
+                } else {
+                    label.stringValue = "Trial: \(trialsRemaining) remaining"
+                }
+                label.textColor = NSColor(red: 1.0, green: 0.8, blue: 0.4, alpha: 1.0) // Orange/yellow
+                logger.debug("Subscription status: \(trialsRemaining) trials remaining")
+            } else {
+                if let timeRemaining = Tier7Trial.timeRemaining {
+                    label.stringValue = "No trials · Next in: \(timeRemaining)"
+                    logger.debug("Subscription status: No trials, next in \(timeRemaining)")
+                } else {
+                    label.stringValue = "No Tier7 access"
+                    logger.debug("Subscription status: No Tier7 access")
+                }
+                label.textColor = NSColor(red: 0.8, green: 0.4, blue: 0.4, alpha: 1.0) // Red
+            }
+        } else {
+            // macOS 10.14 and earlier - no trial system
+            if userOwnsTier7 {
+                label.stringValue = "✓ Tier7 Subscriber"
+                label.textColor = NSColor(red: 0.4, green: 0.8, blue: 0.4, alpha: 1.0) // Green
+            } else {
+                label.stringValue = "No Tier7 access"
+                label.textColor = NSColor(red: 0.8, green: 0.4, blue: 0.4, alpha: 1.0) // Red
+            }
+        }
+
+        label.isHidden = false
+        logger.debug("Subscription status label updated: '\(label.stringValue)', hidden: \(label.isHidden)")
     }
     
     private func showAvailableMinionTypes() {
@@ -156,6 +250,9 @@ class BattlegroundsSession: OverWindowController {
             }
             return
         }
+
+        // Ensure subscription label is created on first update
+        setupSubscriptionStatusLabel()
         let game = AppDelegate.instance().coreManager.game
         let showAvailable = Settings.showMinionTypes != 0
         let races = showAvailable ? game.availableRaces : game.unavailableRaces
@@ -250,16 +347,27 @@ class BattlegroundsSession: OverWindowController {
     @available(macOS 10.15, *)
     public func updateCompositionStatsVisibility() async {
         let userOwnsTier7 = HSReplayAPI.accountData?.is_tier7 ?? false
-        
+        logger.debug("Composition stats: updateCompositionStatsVisibility - userOwnsTier7: \(userOwnsTier7)")
+
         if let acc = MirrorHelper.getAccountId() {
             if !userOwnsTier7 {
+                logger.debug("Composition stats: Updating trial status for account")
                 await Tier7Trial.update(hi: acc.hi.int64Value, lo: acc.lo.int64Value)
+                logger.debug("Composition stats: Trial remaining: \(Tier7Trial.remainingTrials?.description ?? "unknown")")
             }
         }
         if isDuos || !Settings.showBattlegroundsTier7SessionCompStats {
+            logger.debug("Composition stats: Section visibility = false (isDuos: \(isDuos), showInSettings: \(Settings.showBattlegroundsTier7SessionCompStats))")
             availableCompStatsSectionVisibility = false
         } else {
-            availableCompStatsSectionVisibility = userOwnsTier7 || Tier7Trial.remainingTrials ?? 0 > 0 || compositionStats != nil
+            let hasAccess = userOwnsTier7 || Tier7Trial.remainingTrials ?? 0 > 0 || compositionStats != nil
+            logger.debug("Composition stats: Section visibility = \(hasAccess) (tier7: \(userOwnsTier7), trials: \(Tier7Trial.remainingTrials?.description ?? "0"), hasStats: \(compositionStats != nil))")
+            availableCompStatsSectionVisibility = hasAccess
+        }
+
+        // Update the subscription status label
+        await MainActor.run {
+            updateSubscriptionStatusLabel()
         }
     }
     
@@ -289,65 +397,102 @@ class BattlegroundsSession: OverWindowController {
     
     @available(macOS 10.15.0, *)
     private func getBattlegroundsCompStats() async throws -> BattlegroundsCompStats? {
+        logger.debug("=== Composition Stats Loading Debug ===")
+
         if isDuos {
+            logger.debug("Composition stats: Skipped (Duos mode - compositions not supported)")
             return nil
         }
-        
+
         let game = AppDelegate.instance().coreManager.game
-        
+
         if game.spectator {
+            logger.debug("Composition stats: Skipped (Spectator mode)")
             return nil
         }
-        
+
         if !Settings.enableTier7Overlay {
+            logger.debug("Composition stats: Skipped (Tier7 overlay disabled in settings)")
             return nil
         }
-        
+
         if RemoteConfig.data?.tier7?.disabled ?? false {
-            // FIXME
+            logger.debug("Composition stats: Skipped (Tier7 disabled via remote config)")
             return nil
         }
-        
+
         let userOwnsTier7 = HSReplayAPI.accountData?.is_tier7 ?? false
-        
+        logger.debug("Composition stats: User owns Tier7: \(userOwnsTier7)")
+
         var counter = 0
         while game.availableRaces == nil && counter < 5 {
+            logger.debug("Composition stats: Waiting for available races... (attempt \(counter + 1)/5)")
             await Task.sleep(milliseconds: 500)
             counter += 1
         }
         guard let availableRaces = game.availableRaces else {
+            logger.error("Composition stats: FAILED - Unable to get available races after \(counter) attempts")
             throw CompositionStatsException("Unable to get available races")
         }
-        
+        logger.debug("Composition stats: Available races: \(availableRaces.map { $0.rawValue })")
+
         let compParams = BattlegroundsCompStatsParams(minion_types: availableRaces.compactMap { x in Race.allCases.firstIndex(of: x) }, game_language: Settings.hearthstoneLanguage?.rawValue ?? "enUS")
-        
+        logger.debug("Composition stats: Request params - minion_types: \(compParams.minion_types), language: \(compParams.game_language)")
+
         var token: String?
-        
+
         if !userOwnsTier7 {
+            logger.debug("Composition stats: User does not own Tier7, attempting to use trial...")
             let acc = MirrorHelper.getAccountId()
-            
+
             if let acc {
+                logger.debug("Composition stats: Account ID retrieved (hi: \(acc.hi), lo: \(acc.lo))")
+                logger.debug("Composition stats: Trial status - Remaining trials: \(Tier7Trial.remainingTrials?.description ?? "unknown")")
+                if let timeRemaining = Tier7Trial.timeRemaining {
+                    logger.info("Composition stats: Trial reset time: \(timeRemaining)")
+                }
+
                 token = await Tier7Trial.activate(hi: acc.hi.int64Value, lo: acc.lo.int64Value)
-                
+
                 if token == nil {
+                    logger.error("Composition stats: FAILED - Unable to get trial token (trials exhausted or activation failed)")
+                    if Tier7Trial.remainingTrials == 0 {
+                        if let timeRemaining = Tier7Trial.timeRemaining {
+                            logger.info("Composition stats: No trials remaining. Next trial available in: \(timeRemaining)")
+                        } else {
+                            logger.info("Composition stats: No trials remaining. Please subscribe to HSReplay Tier7 for unlimited access.")
+                        }
+                    }
                     throw CompositionStatsException("Unable to get trial token")
                 }
+                logger.debug("Composition stats: Trial token activated successfully")
+            } else {
+                logger.error("Composition stats: FAILED - Unable to retrieve account ID from HearthMirror")
+                throw CompositionStatsException("Unable to get account ID")
             }
+        } else {
+            logger.debug("Composition stats: Using Tier7 subscription (OAuth authentication)")
         }
-        
+
         // At this point the user either owns tier7 or has an active trial!
+        logger.debug("Composition stats: Sending API request...")
 
         var compStats: BattlegroundsCompStats?
         if let token {
+            logger.debug("Composition stats: Using trial token for API request")
             compStats = await HSReplayAPI.getTier7CompStats(token: token, parameters: compParams)
         } else {
+            logger.debug("Composition stats: Using OAuth authentication for API request")
             compStats = await HSReplayAPI.getTier7CompStats(parameters: compParams)
         }
 
         if compStats == nil || compStats?.data.first_place_comps_lobby_races.count == 0 {
+            logger.error("Composition stats: FAILED - Invalid server response (nil or empty composition array)")
+            logger.debug("Composition stats: Response details - compStats nil: \(compStats == nil), count: \(compStats?.data.first_place_comps_lobby_races.count ?? -1)")
             throw CompositionStatsException("Invalid server response")
         }
 
+        logger.debug("Composition stats: SUCCESS - Loaded \(compStats?.data.first_place_comps_lobby_races.count ?? 0) compositions")
         return compStats
     }
     
@@ -391,17 +536,22 @@ class BattlegroundsSession: OverWindowController {
     @available(macOS 10.15.0, *)
     private func updateCompositionStatsIfNeeded() async {
         let game = AppDelegate.instance().coreManager.game
-        
+
+        logger.debug("Composition stats: updateCompositionStatsIfNeeded called - currentMode: \(game.currentMode), scene: \(SceneHandler.scene)")
+
         if game.currentMode != .gameplay || SceneHandler.scene != .gameplay {
+            logger.debug("Composition stats: Clearing stats (not in gameplay mode)")
             clearCompositionStats()
             return
         }
-        
+
         // Ensures data was already fetched and no more API calls are needed
         if ((compositionStats != nil && compositionStats?.count != 0) || compStatsErrorVisibility)  && (game.currentMode == .gameplay || SceneHandler.scene == .gameplay) {
+            logger.debug("Composition stats: Already loaded or error shown, skipping update (stats count: \(compositionStats?.count ?? 0), errorVisible: \(compStatsErrorVisibility))")
             return
         }
 
+        logger.debug("Composition stats: Attempting to fetch composition stats...")
         await trySetCompStats()
     }
     
@@ -427,12 +577,16 @@ class BattlegroundsSession: OverWindowController {
     }
 
     private func handleCompStatsError(_ error: Error) {
+        logger.error("Composition stats: Error occurred - \(error)")
         logger.error(error)
-        
+
         let game = AppDelegate.instance().coreManager.game
-        
+
         let beforeHeroPicked = (game.gameEntity?[GameTag.step] ?? 0) <= Step.begin_mulligan.rawValue
+        logger.debug("Composition stats: beforeHeroPicked: \(beforeHeroPicked), gameStep: \(game.gameEntity?[GameTag.step] ?? 0)")
+
         if !beforeHeroPicked {
+            logger.debug("Composition stats: Scheduling error hide after 20 seconds")
             if #available(macOS 10.15, *) {
                 Task.detached {
                     // Ensure update after 20 seconds
@@ -442,6 +596,7 @@ class BattlegroundsSession: OverWindowController {
             }
         }
 
+        logger.debug("Composition stats: Setting error visibility state")
         compStatsErrorVisibility = true
         compStatsBodyVisibility = false
         compStatsWaitingMsgVisibility = false

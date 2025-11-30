@@ -13,7 +13,6 @@ import Preferences
 import Sparkle
 import Sentry
 import AppMover
-import Mixpanel
 
 import OAuthSwift
 
@@ -69,8 +68,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUStandardUserDriverDelegat
         GameTag.initialize()
         Race.initialize()
         //setenv("CFNETWORK_DIAGNOSTICS", "3", 1)
-        
-        Mixpanel.initialize(token: "da39869dcbc77a77a53506f12ff08094")
 
         SentrySDK.start { options in
             options.dsn = "https://254d50452b94680e7ac7968694d1de3a@o35918.ingest.us.sentry.io/92505"
@@ -160,9 +157,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUStandardUserDriverDelegat
                         case .success(account: let data):
                             Settings.hsReplayUsername = data.username
 
-                            if !MixpanelEvents.linkedMixpanelToken {
-                                HSReplayAPI.linkMixpanelAccount()
-                            }
                             logger.info("Successfully retrieved account data: Username: \(data.username), battletag: \(data.battletag)")
                         }
                     }.catch { error in
@@ -179,9 +173,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUStandardUserDriverDelegat
                     logger.error("Failed to retrieve account data")
                 case .success(account: let data):
                     Settings.hsReplayUsername = data.username
-                    if !MixpanelEvents.linkedMixpanelToken {
-                        HSReplayAPI.linkMixpanelAccount()
-                    }
                     logger.info("Successfully retrieved account data: Username: \(data.username), battletag: \(data.battletag)")
                 }
             }

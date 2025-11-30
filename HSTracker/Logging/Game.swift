@@ -11,7 +11,6 @@
 import Foundation
 import RealmSwift
 import HearthMirror
-import Mixpanel
 
 struct Sideboard {
     let ownerCardId: String
@@ -1984,7 +1983,7 @@ class Game: NSObject, PowerEventHandler {
             return
         }
 
-        var properties: Properties = [
+        /*var properties: Properties = [
             "franchise": isBattlegroundsMatch() ? "Battlegrounds" : "HS-Constructed",
             "game_type": currentGameType.rawValue,
             // TODO: If we want to add more event tracking to HSTracker
@@ -1996,9 +1995,7 @@ class Game: NSObject, PowerEventHandler {
 
         if isArenaMatch {
             properties["sub_franchise"] = ["Arena"]
-        }
-
-        MixpanelEvents.sendEvent(event: .EndMatch, properties: properties)
+        } */
     }
 
     func handleEndGame() {

@@ -14,12 +14,18 @@ class HSReplayNetHelper {
     static func initialize() {
         CollectionHelpers.hearthstone.onCollectionChanged = {
             /*Task.init {*/ DispatchQueue.global().async {
-                /*await*/ syncCollection()
+                // Only sync collection if auto-sync is enabled
+                if Settings.hsReplayAutoSyncCollection {
+                    /*await*/ syncCollection()
+                }
             }
         }
         CollectionHelpers.mercenaries.onCollectionChanged = {
             /*Task.init*/ DispatchQueue.global().async {
-                /*await*/ syncMercenariesCollection()
+                // Only sync collection if auto-sync is enabled
+                if Settings.hsReplayAutoSyncCollection {
+                    /*await*/ syncMercenariesCollection()
+                }
             }
         }
     }

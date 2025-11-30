@@ -475,30 +475,32 @@ final class Settings {
     static var hsReplayUsername: String?
     @UserDefault(key: Settings.hsreplay_id, defaultValue: nil)
     static var hsReplayId: Int?
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_matches, defaultValue: false)
     static var hsReplaySynchronizeMatches: Bool
     @UserDefault(key: Settings.hsreplay_show_push_notification, defaultValue: true)
     static var showHSReplayPushNotification: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_ranked_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_ranked_matches, defaultValue: false)
     static var hsReplayUploadRankedMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_casual_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_casual_matches, defaultValue: false)
     static var hsReplayUploadCasualMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_arena_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_arena_matches, defaultValue: false)
     static var hsReplayUploadArenaMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_brawl_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_brawl_matches, defaultValue: false)
     static var hsReplayUploadBrawlMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_friendly_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_friendly_matches, defaultValue: false)
     static var hsReplayUploadFriendlyMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_adventure_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_adventure_matches, defaultValue: false)
     static var hsReplayUploadAdventureMatches: Bool
     @UserDefault(key: Settings.hsreplay_auto_synchronize_spectator_matches, defaultValue: false)
     static var hsReplayUploadSpectatorMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_battlegrounds_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_battlegrounds_matches, defaultValue: false)
     static var hsReplayUploadBattlegroundsMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_duels_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_duels_matches, defaultValue: false)
     static var hsReplayUploadDuelsMatches: Bool
-    @UserDefault(key: Settings.hsreplay_auto_synchronize_mercenaries_matches, defaultValue: true)
+    @UserDefault(key: Settings.hsreplay_auto_synchronize_mercenaries_matches, defaultValue: false)
     static var hsReplayUploadMercenariesMatches: Bool
+    @UserDefault(key: "hsreplay_auto_sync_collection", defaultValue: false)
+    static var hsReplayAutoSyncCollection: Bool
 
     @UserDefault(key: Settings.theme_token, defaultValue: "dark")
     static var theme: String
